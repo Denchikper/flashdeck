@@ -1,0 +1,59 @@
+# Flashdeck — карточки для запоминания слов
+# by Benovich · https://github.com/Denchikper/flashdeck
+
+name: build
+
+# Право на запись нужно, чтобы создавать черновик релиза по тегу
+permissions:
+  contents: write
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Установка зависимостей
+        run: pip install -r requirements.txt
+
+      - name: Тесты
+        run: python -m unittest -v
+
+      - name: Сборка exe
+        run: pyinstaller --noconfirm flashdeck.spec
+
+      # Имя с версией и платформой, чтобы в релизе было понятно, что качать
+      - name: Подготовка артефакта
+        shell: bash
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          ver="${REF#v}"
+          case "$GITHUB_REF" in refs/tags/v*) ;; *) ver="dev" ;; esac
+          mkdir -p release
+          cp dist/Flashdeck.exe "release/Flashdeck_${ver}_Windows_x64.exe"
+          ls -la release/
+
+      - name: Артефакт сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: flashdeck-windows
+          path: release/*
+
+      - name: Черновик релиза
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Flashdeck ${{ github.ref_name }}
+          draft: true
+          files: release/*
