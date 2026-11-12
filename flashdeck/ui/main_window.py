@@ -7,15 +7,17 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QFont, QKeySequence
 from PyQt6.QtWidgets import (
     QFileDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem,
-    QMainWindow, QMessageBox, QProgressBar, QPushButton, QStyle, QVBoxLayout, QWidget,
+    QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QStyle, QVBoxLayout, QWidget,
 )
 
 from flashdeck import csv_io
-from flashdeck.config import APP_NAME, APP_VERSION, AUTHOR, REPO_URL
+from flashdeck.config import APP_NAME
 from flashdeck.models import Deck
 from flashdeck.repositories import Repositories
 from flashdeck.trainer import TrainingSession, pick_cards
+from flashdeck.ui.about_dialog import AboutDialog
 from flashdeck.ui.deck_window import DeckWindow
+from flashdeck.ui.stats_window import StatsWindow
 from flashdeck.ui.training_setup import TrainingSetupDialog
 from flashdeck.ui.training_window import TrainingWindow
 
@@ -52,6 +54,10 @@ class MainWindow(QMainWindow):
         self.train_action.setShortcut("Ctrl+T")
         self.train_action.triggered.connect(self.start_training)
 
+        self.stats_action = QAction(icon(pix.SP_FileDialogInfoView), "Статистика", self)
+        self.stats_action.setShortcut("Ctrl+Shift+S")
+        self.stats_action.triggered.connect(self.show_stats)
+
         self.rename_action = QAction(icon(pix.SP_FileDialogDetailedView), "Переименовать", self)
         self.rename_action.setShortcut("F2")
         self.rename_action.triggered.connect(self.rename_deck)
@@ -76,7 +82,8 @@ class MainWindow(QMainWindow):
         self.about_action.triggered.connect(self.show_about)
 
         # Действия, которым нужна выбранная колода
-        self.deck_actions = [self.open_action, self.train_action, self.rename_action,
+        self.deck_actions = [self.open_action, self.train_action, self.stats_action,
+                             self.rename_action,
                              self.delete_action, self.export_action]
 
     def create_menu(self) -> None:
@@ -87,7 +94,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.quit_action)
 
         deck_menu = menu.addMenu("Колода")
-        deck_menu.addActions([self.new_action, self.open_action, self.train_action])
+        deck_menu.addActions([self.new_action, self.open_action, self.train_action,
+                              self.stats_action])
         deck_menu.addSeparator()
         deck_menu.addActions([self.rename_action, self.delete_action])
 
@@ -98,9 +106,8 @@ class MainWindow(QMainWindow):
         toolbar = self.addToolBar("Основное")
         toolbar.setMovable(False)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        toolbar.addActions([self.new_action, self.open_action, self.train_action])
-        toolbar.addSeparator()
-        toolbar.addActions([self.rename_action, self.delete_action])
+        toolbar.addActions([self.new_action, self.open_action, self.train_action,
+                            self.stats_action])
         toolbar.addSeparator()
         toolbar.addActions([self.import_action, self.export_action])
 
@@ -109,6 +116,8 @@ class MainWindow(QMainWindow):
         self.deck_list.setMinimumWidth(280)
         self.deck_list.currentRowChanged.connect(self.show_deck_info)
         self.deck_list.itemDoubleClicked.connect(self.open_deck)
+        self.deck_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.deck_list.customContextMenuRequested.connect(self.show_context_menu)
 
         self.title_label = QLabel()
         title_font = QFont()
@@ -126,6 +135,8 @@ class MainWindow(QMainWindow):
         self.train_button.clicked.connect(self.start_training)
         self.open_button = QPushButton("Открыть колоду")
         self.open_button.clicked.connect(self.open_deck)
+        self.stats_button = QPushButton("Статистика")
+        self.stats_button.clicked.connect(self.show_stats)
 
         self.empty_label = QLabel("Колод пока нет.\nСоздайте новую или импортируйте из CSV.")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -136,6 +147,7 @@ class MainWindow(QMainWindow):
         info.addWidget(self.progress_bar)
         info.addWidget(self.train_button)
         info.addWidget(self.open_button)
+        info.addWidget(self.stats_button)
         info.addStretch()
         self.info_panel = QWidget()
         self.info_panel.setLayout(info)
@@ -149,6 +161,15 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.deck_list)
         layout.addLayout(right, stretch=1)
         self.setCentralWidget(central)
+
+    def show_context_menu(self, pos) -> None:
+        if self.deck_list.itemAt(pos) is None:
+            return
+        menu = QMenu(self)
+        menu.addActions([self.open_action, self.train_action, self.stats_action])
+        menu.addSeparator()
+        menu.addActions([self.rename_action, self.export_action, self.delete_action])
+        menu.exec(self.deck_list.viewport().mapToGlobal(pos))
 
     def load_decks(self, select_id: int | None = None) -> None:
         if select_id is None and self.current_deck():
@@ -231,6 +252,11 @@ class MainWindow(QMainWindow):
         TrainingWindow(deck, session, self.repos, self).exec()
         self.load_decks()
 
+    def show_stats(self) -> None:
+        deck = self.current_deck()
+        if deck:
+            StatsWindow(self.decks, deck, self.repos, self).exec()
+
     def rename_deck(self) -> None:
         deck = self.current_deck()
         if not deck:
@@ -290,9 +316,4 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Колода сохранена в {path}", 5000)
 
     def show_about(self) -> None:
-        QMessageBox.about(
-            self, "О программе",
-            f"<b>{APP_NAME}</b> {APP_VERSION}<br>"
-            f"Карточки для запоминания слов.<br><br>"
-            f"by {AUTHOR} · <a href='{REPO_URL}'>GitHub</a>",
-        )
+        AboutDialog(self).exec()
