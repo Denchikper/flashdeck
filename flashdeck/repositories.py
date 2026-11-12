@@ -114,6 +114,16 @@ class CardRepository:
             (MAX_LEVEL, delta, card_id),
         )
 
+    def level_counts(self, deck_id: int) -> list[int]:
+        """Сколько карточек на каждом уровне от 0 до MAX_LEVEL."""
+        counts = [0] * (MAX_LEVEL + 1)
+        rows = self.db.fetch_all(
+            "SELECT level, COUNT(*) FROM cards WHERE deck_id = ? GROUP BY level", (deck_id,)
+        )
+        for level, count in rows:
+            counts[level] = count
+        return counts
+
     def reset_levels(self, deck_id: int) -> None:
         self.db.execute("UPDATE cards SET level = 0 WHERE deck_id = ?", (deck_id,))
 
