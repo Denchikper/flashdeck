@@ -14,7 +14,10 @@ from flashdeck import csv_io
 from flashdeck.config import APP_NAME, APP_VERSION, AUTHOR, REPO_URL
 from flashdeck.models import Deck
 from flashdeck.repositories import Repositories
+from flashdeck.trainer import TrainingSession, pick_cards
 from flashdeck.ui.deck_window import DeckWindow
+from flashdeck.ui.training_setup import TrainingSetupDialog
+from flashdeck.ui.training_window import TrainingWindow
 
 CSV_FILTER = "CSV-файлы (*.csv);;Все файлы (*)"
 
@@ -45,6 +48,10 @@ class MainWindow(QMainWindow):
         self.open_action.setShortcut("Ctrl+O")
         self.open_action.triggered.connect(self.open_deck)
 
+        self.train_action = QAction(icon(pix.SP_MediaPlay), "Тренировка", self)
+        self.train_action.setShortcut("Ctrl+T")
+        self.train_action.triggered.connect(self.start_training)
+
         self.rename_action = QAction(icon(pix.SP_FileDialogDetailedView), "Переименовать", self)
         self.rename_action.setShortcut("F2")
         self.rename_action.triggered.connect(self.rename_deck)
@@ -69,7 +76,7 @@ class MainWindow(QMainWindow):
         self.about_action.triggered.connect(self.show_about)
 
         # Действия, которым нужна выбранная колода
-        self.deck_actions = [self.open_action, self.rename_action,
+        self.deck_actions = [self.open_action, self.train_action, self.rename_action,
                              self.delete_action, self.export_action]
 
     def create_menu(self) -> None:
@@ -80,8 +87,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.quit_action)
 
         deck_menu = menu.addMenu("Колода")
-        deck_menu.addActions([self.new_action, self.open_action,
-                              self.rename_action, self.delete_action])
+        deck_menu.addActions([self.new_action, self.open_action, self.train_action])
+        deck_menu.addSeparator()
+        deck_menu.addActions([self.rename_action, self.delete_action])
 
         help_menu = menu.addMenu("Справка")
         help_menu.addAction(self.about_action)
@@ -90,8 +98,9 @@ class MainWindow(QMainWindow):
         toolbar = self.addToolBar("Основное")
         toolbar.setMovable(False)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        toolbar.addActions([self.new_action, self.open_action, self.rename_action,
-                            self.delete_action])
+        toolbar.addActions([self.new_action, self.open_action, self.train_action])
+        toolbar.addSeparator()
+        toolbar.addActions([self.rename_action, self.delete_action])
         toolbar.addSeparator()
         toolbar.addActions([self.import_action, self.export_action])
 
@@ -112,6 +121,9 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setFormat("Выучено %p%")
 
+        self.train_button = QPushButton("Начать тренировку")
+        self.train_button.setMinimumHeight(40)
+        self.train_button.clicked.connect(self.start_training)
         self.open_button = QPushButton("Открыть колоду")
         self.open_button.clicked.connect(self.open_deck)
 
@@ -122,6 +134,7 @@ class MainWindow(QMainWindow):
         info.addWidget(self.title_label)
         info.addWidget(self.info_label)
         info.addWidget(self.progress_bar)
+        info.addWidget(self.train_button)
         info.addWidget(self.open_button)
         info.addStretch()
         self.info_panel = QWidget()
@@ -200,6 +213,23 @@ class MainWindow(QMainWindow):
         if deck:
             DeckWindow(deck, self.repos, self).exec()
             self.load_decks()
+
+    def start_training(self) -> None:
+        deck = self.current_deck()
+        if not deck:
+            return
+        cards = self.repos.cards.by_deck(deck.id)
+        if not cards:
+            QMessageBox.information(self, "Тренировка", "В колоде пока нет карточек.")
+            return
+
+        setup = TrainingSetupDialog(deck, cards, self)
+        if not setup.exec():
+            return
+        settings = setup.settings()
+        session = TrainingSession(pick_cards(cards, settings), settings, cards)
+        TrainingWindow(deck, session, self.repos, self).exec()
+        self.load_decks()
 
     def rename_deck(self) -> None:
         deck = self.current_deck()
