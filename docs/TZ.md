@@ -68,6 +68,7 @@ flashdeck/
     models.py           классы данных
     trainer.py          логика тренировки
     csv_io.py           импорт/экспорт CSV, отчёт TXT
+    images.py           хранение картинок карточек
     ui/
         main_window.py      главное окно (QMainWindow)
         deck_window.py      редактор колоды
@@ -78,5 +79,7 @@ flashdeck/
         about_dialog.py     о программе
         chart_widget.py     график точности (QPainter)
     ui/forms/           .ui-файлы из Qt Designer
-assets/                 иконка, примеры колод
+assets/                 иконка, пример колоды
+tests/                  тесты логики, БД и CSV
+flashdeck.spec          сборка exe (PyInstaller)
 ```

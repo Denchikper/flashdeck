@@ -39,7 +39,7 @@ class TrainingWindow(QDialog):
         self.saved = False
 
         self.setWindowTitle(f"Тренировка — {deck.name}")
-        self.resize(560, 600)
+        self.resize(560, 480)
         self.build_ui()
         self.show_question()
 
