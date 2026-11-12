@@ -16,7 +16,6 @@ def resource_path(relative: str) -> Path:
     return Path(base) / relative
 
 
-# Данные пользователя храним в домашней папке: рядом с exe писать нельзя
 DATA_DIR = Path.home() / ".flashdeck"
 DB_PATH = DATA_DIR / "flashdeck.db"
 IMAGES_DIR = DATA_DIR / "images"

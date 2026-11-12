@@ -56,12 +56,16 @@ class CardRepository:
             (deck_id,),
         )
         cards = [Card(**dict(row)) for row in rows]
-        # LIKE в SQLite не понимает регистр кириллицы, поэтому фильтруем здесь
+        # LIKE в SQLite не понимает регистр кириллицы, поэтому фильтрация здесь
         query = search.strip().casefold()
         if query:
             cards = [c for c in cards
                      if query in c.word.casefold() or query in c.translation.casefold()]
         return cards
+
+    def count(self, deck_id: int) -> int:
+        row = self.db.fetch_one("SELECT COUNT(*) FROM cards WHERE deck_id = ?", (deck_id,))
+        return row[0]
 
     def get(self, card_id: int) -> Card | None:
         row = self.db.fetch_one("SELECT * FROM cards WHERE id = ?", (card_id,))
@@ -77,6 +81,17 @@ class CardRepository:
              card.example, card.image_path, card.level),
         )
         return cur.lastrowid
+
+    def add_many(self, deck_id: int, cards: list[Card]) -> None:
+        with self.db.conn:
+            self.db.conn.executemany(
+                """
+                INSERT INTO cards (deck_id, word, translation, example, image_path, level)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [(deck_id, c.word, c.translation, c.example, c.image_path, c.level)
+                 for c in cards],
+            )
 
     def update(self, card: Card) -> None:
         self.db.execute(
@@ -170,3 +185,10 @@ class SessionRepository:
             (deck_id,),
         )
         return tuple(row)
+
+
+class Repositories:
+    def __init__(self, db: Database):
+        self.decks = DeckRepository(db)
+        self.cards = CardRepository(db)
+        self.sessions = SessionRepository(db)
