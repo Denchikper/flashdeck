@@ -1,11 +1,13 @@
-# Flashdeck — импорт/экспорт колод в CSV
+# Flashdeck — импорт/экспорт колод в CSV и отчёты в TXT
 # by Benovich · https://github.com/Denchikper/flashdeck
 
 import csv
+from datetime import datetime
 from pathlib import Path
 
 from flashdeck.config import CSV_HEADER
 from flashdeck.models import Card
+from flashdeck.trainer import TrainingSession
 
 
 class CsvFormatError(Exception):
@@ -47,3 +49,26 @@ def write_cards(path: Path, cards: list[Card]) -> None:
         writer.writerow(CSV_HEADER)
         for card in cards:
             writer.writerow([card.word, card.translation, card.example])
+
+
+def write_report(path: Path, deck_name: str, session: TrainingSession) -> None:
+    """Текстовый отчёт о тренировке."""
+    settings = session.settings
+    lines = [
+        f"Flashdeck — отчёт о тренировке ({datetime.now():%d.%m.%Y %H:%M})",
+        "",
+        f"Колода:      {deck_name}",
+        f"Режим:       {settings.mode.value}, {settings.direction.value.lower()}",
+        f"Результат:   {session.correct_count} из {len(session.answers)} "
+        f"({session.accuracy}%)",
+        "",
+    ]
+    for number, answer in enumerate(session.answers, start=1):
+        mark = "+" if answer.is_correct else "-"
+        line = f"{number:>3}. [{mark}] {session.question(answer.card)} — "
+        line += session.expected(answer.card)
+        if not answer.is_correct:
+            line += f"  (ответ: {answer.given or 'пусто'})"
+        lines.append(line)
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
